@@ -6,7 +6,6 @@ import reflect.runtime.currentMirror
 
 import scala.reflect.runtime.universe._
 
-
 /*****************************************************************************************************************
     This application will received as input an OBJECT and a PATH to the field which needs to be anonymzed.
 
@@ -22,39 +21,29 @@ object ObjectAnonymizer extends App {
 
   /** 1- Defining testing input Object *************************************************************************/
 
- 
   case class Name (firstName : String, lastName : String)
   case class Documents (idx: String, name: Name, code: String)
   case class Country (id: Long, name: String, states : Map[String, String], docs : Seq[Documents])
 
-  val mName1 = Name("Roger Jr", "Rabbit")
+  val mName1 = Name("Roger", "Rabbit")
   val mName2 = Name("Bucks", "Bunny")
+
   val doc1 = Documents("12", mName1, "ps")
   val doc2 = Documents("22", mName2, "in")
+
   val states = Map("AK" -> "Alaska", "AL" -> "Alabama", "AR" -> "Arkansas")
+
   val country = Country(23423, "USA", states, Seq(doc1, doc2))
 
   val path = "docs.name.firstName"
   val hierarchy = path.split('.')
-  
-  /***************************************************************************************************************/
 
-  // Testinf the Application:  
-
-  val retMap = anonymizeObject[Country](country, hierarchy, 0)
-  val retObj = fromMapToObject[Country](retMap.asInstanceOf[Map[String,_]])
-  
+  // Initial call:
   println("Path to the field to be anonimized: "+path)
   println("Input: "+country)
+  val retMap = anonymizeObject[Country](country, hierarchy, 0)
+  val retObj = fromMapToObject[Country](retMap.asInstanceOf[Map[String,_]])
   println("Output: "+retObj)
-
-  /****** OUTPUT:
-  Path to the field to be anonimized: docs.name.firstName
-  Input: Country(23423,USA,Map(AK -> Alaska, AL -> Alabama, AR -> Arkansas),List(Documents(12,Name(Roger Jr,Rabbit),ps), Documents(22,Name(Bucks,Bunny),in)))
-  Output: Country(23423,USA,Map(AK -> Alaska, AL -> Alabama, AR -> Arkansas),List(Documents(12,Name(xxxx,Rabbit),ps), Documents(22,Name(xxxx,Bunny),in)))
-  ******/
- 
-
 
   /*****************************************************************************************************************
   //   Method to select from the input Object all the attributes which should be anonymized.
@@ -67,7 +56,7 @@ object ObjectAnonymizer extends App {
   //   Output:
   //   * Map[String,_]: Map with the same fields of the input Object, but with the corresponding fields anonymized
   ****************************************************************************************************************/
-  def anonymizeObject[T: ClassTag](inputObject: Any,  hierarchy : Array[String], idx : Int): Any = {
+  def anonymizeObject[T: ClassTag](inputObject: Any,  hierarchy : Array[String], idx : Int): Map[String,_] = {
 
     // Converting the input Object into maps with matchTypes, types, typeSymbol and values
     val (mMatchTypes, mTypes, mSymbols, mValues) = fromObjectToMap[T](inputObject.asInstanceOf[T])
@@ -86,11 +75,10 @@ object ObjectAnonymizer extends App {
 
     // Original Object converted into Map
     val origMap = mValues.asInstanceOf[Map[String,_]]
-    //TODO: this return case can be improved
-    // Updating the Original Object
-    val upMap = origMap.updated(hierarchy(idx), retObj)
-    upMap
 
+    // Updating the Original Object
+    origMap.updated(hierarchy(idx), retObj)
+    
   }
 
   /**********************************************************************************************************************
@@ -152,9 +140,7 @@ object ObjectAnonymizer extends App {
     ***********************************************************************************************************************/
   def selectChildType[T: ClassTag](input : Any, chMatchType : Type, chType: Type, chSymbol : Symbol,  hierarchy : Array[String], idx : Int) : Any = {
 
-    //TODO simplify the return logic
-
-    val ret = chMatchType.toString() match {
+    chMatchType.toString() match {
       case "String" =>  anonymizeString(input.asInstanceOf[String])
       case mType if mType.startsWith("Seq")
         || mType.startsWith("List") =>  anonymizeList[T](input, chType, chSymbol, hierarchy, idx)
@@ -165,7 +151,6 @@ object ObjectAnonymizer extends App {
         retObj
       }
     }
-    ret
   }
 
   /************************************************************************************************************
@@ -185,7 +170,7 @@ object ObjectAnonymizer extends App {
     ***********************************************************************************************************************/
 
   //TODO: Fix that return type, so it is not Any, byt T... at the end we are doing that asInstanceOf[T]
-  def fromMapToObject[T : ClassTag ](input: Map[String,_], mSymbol: Symbol, mType :Type): Any = {
+  def fromMapToObject[T : ClassTag ](input: Map[String,_], mSymbol: Symbol, mType :Type): T = {
 
     val rm = runtimeMirror(classTag[T].runtimeClass.getClassLoader)
     val classTest = mSymbol.asClass
